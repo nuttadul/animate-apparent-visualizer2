@@ -27,7 +27,7 @@ def angle_xy(u, v):
     return rad2deg(np.arctan2(det, dot))
 
 # Geometry helpers
-def cylinder_between(z0, z1, radius=0.2, n_theta=40, n_z=16):
+def cylinder_between(z0, z1, radius=0.3, n_theta=40, n_z=16):
     thetas = np.linspace(0, 2*np.pi, n_theta)
     zs = np.linspace(z0, z1, n_z)
     T, Z = np.meshgrid(thetas, zs)
@@ -35,7 +35,7 @@ def cylinder_between(z0, z1, radius=0.2, n_theta=40, n_z=16):
     return x, y, z
 def transform_points(R, pts):
     return (R @ pts.T).T
-def anterior_stripe_lines(z0, z1, radius=0.2, theta=np.pi/2, n=50):
+def anterior_stripe_lines(z0, z1, radius=0.3, theta=np.pi/2, n=50):
     zs = np.linspace(z0, z1, n)
     xs = radius*np.cos(theta)*np.ones_like(zs)
     ys = radius*np.sin(theta)*np.ones_like(zs)
@@ -44,22 +44,22 @@ def anterior_stripe_lines(z0, z1, radius=0.2, theta=np.pi/2, n=50):
 def build_traces(R_dist, show_bone=True, show_stick=True, show_xyproj=True):
     traces = []
     # Proximal surface (fixed)
-    xp, yp, zp = cylinder_between(0.0, 0.9, 0.22)
+    xp, yp, zp = cylinder_between(0.0, 1.5, 0.3)
     traces.append(go.Surface(x=xp, y=yp, z=zp, showscale=False,
                              colorscale=[[0, "#d9e4ff"],[1, "#d9e4ff"]], visible=show_bone, name="prox"))
     # Prox stripe
-    sp = anterior_stripe_lines(0.0, 0.9, 0.22)
+    sp = anterior_stripe_lines(0.0, 1.5, 0.3)
     traces.append(go.Scatter3d(x=sp[:,0], y=sp[:,1], z=sp[:,2], mode="lines",
                                line=dict(color="crimson", width=8), visible=show_bone, name="prox_stripe"))
     # Distal surface (rotated)
-    xd, yd, zd = cylinder_between(0.0, -0.9, 0.22)
+    xd, yd, zd = cylinder_between(0.0, -1.5, 0.3)
     pts_d = np.stack([xd.flatten(), yd.flatten(), zd.flatten()], axis=1)
     td = transform_points(R_dist, pts_d)
     xd2 = td[:,0].reshape(xd.shape); yd2 = td[:,1].reshape(yd.shape); zd2 = td[:,2].reshape(zd.shape)
     traces.append(go.Surface(x=xd2, y=yd2, z=zd2, showscale=False,
                              colorscale=[[0, "#ffe0cc"],[1, "#ffe0cc"]], visible=show_bone, name="dist"))
     # Dist stripe
-    sd = anterior_stripe_lines(0.0, -0.9, 0.22)
+    sd = anterior_stripe_lines(0.0, -1.5, 0.3)
     tsd = transform_points(R_dist, sd)
     traces.append(go.Scatter3d(x=tsd[:,0], y=tsd[:,1], z=tsd[:,2], mode="lines",
                                line=dict(color="crimson", width=8), visible=show_bone, name="dist_stripe"))
@@ -77,7 +77,7 @@ def build_traces(R_dist, show_bone=True, show_stick=True, show_xyproj=True):
         arrow(origin, Ad*0.9, "crimson",  "A_dist"),
     ]
     # XY floor + projections
-    limit=1.8
+    limit=3.0
     rng=np.linspace(-limit, limit, 2); Xf,Yf=np.meshgrid(rng, rng); Zf=np.full_like(Xf,-limit)
     traces.append(go.Surface(x=Xf, y=Yf, z=Zf, opacity=0.12, showscale=False, visible=show_xyproj, name="floor"))
     zproj = -limit + 1e-3
@@ -89,37 +89,29 @@ def build_traces(R_dist, show_bone=True, show_stick=True, show_xyproj=True):
 
 def staged_rotation(alpha, beta, gamma, t):
     if t <= 0: return np.eye(3)
-    if t < 1.0:  # torsion build
-        return rot_z(gamma * t)
-    elif t < 2.0:  # add sagittal
-        return rot_x(alpha * (t-1.0)) @ rot_z(gamma)
-    else:  # add coronal
-        return rot_y(beta * (t-2.0)) @ rot_x(alpha) @ rot_z(gamma)
+    if t < 1.0: return rot_z(gamma * t)
+    elif t < 2.0: return rot_x(alpha * (t-1.0)) @ rot_z(gamma)
+    else: return rot_y(beta * (t-2.0)) @ rot_x(alpha) @ rot_z(gamma)
 
 # App
 st.set_page_config(page_title="Apparent Torsion Visualizer – Animation", layout="wide")
-st.title("Apparent Torsion Visualizer – Animation")
-st.caption("Play through torsion → sagittal → coronal, or scrub with the slider. We report the final apparent torsion only.")
+st.title("Apparent Torsion Visualizer – Animation (Larger Model)")
+st.caption("Play through torsion → sagittal → coronal, or scrub with the slider. Larger model view.")
 
-# Inputs
-c1,c2,c3 = st.columns(3)
-with c1: alpha = st.slider("Sagittal (about X) [deg]", -60.0, 60.0, 0.0, 0.5)
-with c2: beta  = st.slider("Coronal (about Y) [deg]", -60.0, 60.0, 0.0, 0.5)
-with c3: gamma = st.slider("Torsion (about Z) [deg]", -90.0, 90.0, 0.0, 0.5)
-st.markdown('---')
-d1,d2,d3 = st.columns(3)
-with d1: show_bone  = st.checkbox("Show bone", value=True)
-with d2: show_stick = st.checkbox("Show stick", value=True)
-with d3: show_xyproj = st.checkbox("Show XY floor", value=True)
+alpha = st.slider("Sagittal (about X) [deg]", -60.0, 60.0, 0.0, 0.5)
+beta  = st.slider("Coronal (about Y) [deg]", -60.0, 60.0, 0.0, 0.5)
+gamma = st.slider("Torsion (about Z) [deg]", -90.0, 90.0, 0.0, 0.5)
 
-# Final torsion metric
+show_bone  = st.checkbox("Show bone", value=True)
+show_stick = st.checkbox("Show stick", value=True)
+show_xyproj = st.checkbox("Show XY floor", value=True)
+
 R_final = staged_rotation(alpha, beta, gamma, 3.0)
 A_prox = np.array([0,1,0]); A_dist_final = normalize(R_final @ A_prox)
 phi_final = angle_xy(A_prox, A_dist_final)
 st.metric("Final apparent torsion (XY)", f"{phi_final:.2f}°")
 
-# Figure + frames
-limit=1.8
+limit=3.0
 R0 = staged_rotation(alpha, beta, gamma, 0.0)
 fig = go.Figure(data=build_traces(R0, show_bone, show_stick, show_xyproj))
 
@@ -131,7 +123,6 @@ for i in range(n_frames+1):
     frames.append(go.Frame(data=build_traces(R, show_bone, show_stick, show_xyproj), name=f"{t:.3f}"))
 fig.frames = frames
 
-# Slider steps
 steps = []
 for i in range(n_frames+1):
     t = 3.0 * i / n_frames
@@ -143,7 +134,6 @@ for i in range(n_frames+1):
 sliders = [dict(active=0, steps=steps, x=0.1, y=0.05, len=0.8,
                 currentvalue=dict(prefix="Progress: ", suffix=" (0→3)", font=dict(size=14)))]
 
-# Play/Pause
 updatemenus = [dict(type="buttons", showactive=False, x=0.1, y=0.12,
                     buttons=[dict(label="Play", method="animate",
                                   args=[None, {"fromcurrent":True, "frame":{"duration":40,"redraw":True},
