@@ -177,7 +177,9 @@ fig.update_layout(scene=dict(xaxis=dict(range=[-limit,limit], title='X'),
                   margin=dict(l=0,r=0,t=20,b=0),
                   sliders=sliders, updatemenus=updatemenus,
                   height=780,
-                  scene_camera=dict(eye=dict(x=1.4,y=1.4,z=1.2)))
+                  scene_camera=dict(eye=dict(x=1.4,y=1.4,z=1.2)),
+                  uirevision="keep-view"  # <-- preserve camera during animation and UI tweaks
+                  )
 
 with left:
     st.plotly_chart(fig, use_container_width=True)
