@@ -110,9 +110,6 @@ with left:
                 "See the difference between true twist and what you see on axial CT slices."
                 "</div>", unsafe_allow_html=True)
 
-with right:
-    st.write("")
-
 # Inputs (compact, right column)
 with right:
     st.markdown("### Inputs")
@@ -125,12 +122,13 @@ with right:
     show_xyproj = st.checkbox("Show XY floor", value=True)
 
 # Compute final apparent torsion
-R_final = staged_rotation(alpha, beta, gamma, 3.0)
-A_prox = np.array([0,1,0]); A_dist_final = normalize(R_final @ A_prox)
-phi_final = angle_xy(A_prox, A_dist_final)
+def compute_phi(alpha, beta, gamma):
+    R_final = staged_rotation(alpha, beta, gamma, 3.0)
+    A_prox = np.array([0,1,0]); A_dist_final = normalize(R_final @ A_prox)
+    return angle_xy(A_prox, A_dist_final)
 
+phi_final = compute_phi(alpha, beta, gamma)
 with left:
-    # Big main result
     st.markdown(f"<div style='font-size:22px;color:#333;margin-top:4px'>Apparent Torsion (Final)</div>", unsafe_allow_html=True)
     st.markdown(f"<div style='font-size:44px;font-weight:700;margin-top:-6px;margin-bottom:8px'>{phi_final:.1f}°</div>", unsafe_allow_html=True)
 
@@ -161,12 +159,11 @@ sliders = [dict(active=0, steps=steps, x=0.12, y=0.04, len=0.76,
 
 updatemenus = [dict(type="buttons", showactive=False, x=0.12, y=0.10,
                     buttons=[dict(label="Play", method="animate",
-                                  args=[None, {"fromcurrent":True, "frame":{"duration":35,"redraw":True},
+                                  args=[None, {"fromcurrent":True,
+                                               "frame":{"duration":35,"redraw":True},
                                                "transition":{"duration":0}}]),
                              dict(label="Pause", method="animate",
-                                  args=[[None], {"mode":"immediate",
-                                                 "frame":{"duration":0,"redraw":False},
-                                                 "transition":{"duration":0}}])])]
+                                  args=[[None], {"mode":"immediate"}])])]
 
 fig.update_layout(scene=dict(xaxis=dict(range=[-limit,limit], title='X'),
                              yaxis=dict(range=[-limit,limit], title='Y'),
@@ -177,12 +174,8 @@ fig.update_layout(scene=dict(xaxis=dict(range=[-limit,limit], title='X'),
                   margin=dict(l=0,r=0,t=20,b=0),
                   sliders=sliders, updatemenus=updatemenus,
                   height=780,
-                  # Set once; avoid setting in frames
                   scene_camera=dict(eye=dict(x=1.4,y=1.4,z=1.2)),
-                  # Preserve camera & avoid transition resets
-                  uirevision="keep-view",
-                  transition={"duration": 0},
-                  frame={"duration": 35, "redraw": True},
+                  uirevision="keep-view"
                   )
 
 with left:
