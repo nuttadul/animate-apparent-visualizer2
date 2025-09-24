@@ -159,7 +159,7 @@ with right:
 # Auto-advance when playing (keeps camera; we re-apply saved camera each run)
 if st.session_state.get("playing", False):
     st.session_state["t_progress"] = (st.session_state["t_progress"] + 0.03) % 3.0001
-    st.experimental_rerun()  # smooth-ish play without touching camera
+    st.rerun()  # smooth-ish play without touching camera
 
 # ------------------ Compute & Show Result ------------------
 R_final = staged_rotation(alpha, beta, gamma, 3.0)
@@ -198,9 +198,7 @@ events = plotly_events(fig, select_event=False, click_event=False, hover_event=F
 if events and isinstance(events, list):
     for ev in events:
         rel = ev.get("relayout", {})
-        # Plotly relayout keys include 'scene.camera', 'scene.camera.eye', etc.
         if any(k.startswith("scene.camera") for k in rel.keys()):
-            # Merge partial updates
             prev = st.session_state.get("cam", dict(eye=dict(x=1.4,y=1.4,z=1.2)))
             eye    = rel.get("scene.camera.eye",    prev.get("eye"))
             center = rel.get("scene.camera.center", prev.get("center", {"x":0,"y":0,"z":0}))
