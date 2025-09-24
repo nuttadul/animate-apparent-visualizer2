@@ -71,6 +71,7 @@ def bone_pair_traces(R_dist, L_prox=0.9, L_dist=0.9, radius=0.2,
     tsp = sp
     traces.append(go.Scatter3d(x=tsp[:,0], y=tsp[:,1], z=tsp[:,2], mode='lines',
                                line=dict(color=stripe_color, width=8), name='Anterior stripe (prox)', showlegend=True))
+
     # Distal: along -Z from 0..-L_dist then rotated
     xd, yd, zd = cylinder_between(0.0, -L_dist, radius)
     pts_d = np.stack([xd.flatten(), yd.flatten(), zd.flatten()], axis=1)
@@ -106,25 +107,55 @@ def projected_line_to_xy(vec, color='rgba(0,0,0,0.7)', width=6, limit=1.6):
                         mode='lines', line=dict(color=color, width=width),
                         showlegend=False, name='proj→XY')
 
-def build_scene(R_dist, show_bone=True, show_xyproj=True, title=""):
+def stick_traces(R_dist, limit=1.6):
+    origin = np.zeros(3)
+    Zp = np.array([0,0,1])
+    Zd = normalize(R_dist @ np.array([0,0,-1]))
+    Ap = np.array([0,1,0])
+    Ad = normalize(R_dist @ np.array([0,1,0]))
+    traces = []
+    def arrow(start, vec, color, name, width=12):
+        s = np.array(start); v = np.array(vec); tip = s + v
+        line = go.Scatter3d(x=[s[0], tip[0]], y=[s[1], tip[1]], z=[s[2], tip[2]],
+                            mode='lines', line=dict(color=color, width=width), name=name, showlegend=True)
+        cone = go.Cone(x=[tip[0]], y=[tip[1]], z=[tip[2]],
+                       u=[v[0]], v=[v[1]], w=[v[2]], sizemode='absolute', sizeref=0.15,
+                       showscale=False, colorscale=[[0, color],[1, color]], anchor='tip', name=name)
+        return [line, cone]
+    traces += arrow(origin, Zp, 'royalblue',  'Z_prox')
+    traces += arrow(origin, Zd, 'darkorange', 'Z_dist')
+    traces += arrow(origin, Ap*0.9, 'seagreen', 'A_prox')
+    traces += arrow(origin, Ad*0.9, 'crimson',  'A_dist')
+    return traces
+
+def build_scene(R_dist, show_bone=True, show_stick=True, show_xyproj=True, title=""):
     limit=1.8
     traces = []
     traces += axes_traces(limit)
     if show_bone:
-        traces += bone_pair_traces(R_dist)
+        traces += bone_pair_traces(R_dist, L_prox=0.9, L_dist=0.9, radius=0.22)
+    if show_stick:
+        traces += stick_traces(R_dist, limit=limit)
     if show_xyproj:
         traces.append(xy_floor(limit, opacity=0.12))
         Ad = normalize(R_dist @ np.array([0,1,0]))
         traces.append(projected_line_to_xy(np.array([0,1,0])*0.9, color='rgba(46,139,87,0.65)', limit=limit))
         traces.append(projected_line_to_xy(Ad*0.9, color='rgba(220,20,60,0.75)', limit=limit))
     fig = go.Figure(data=traces)
-    fig.update_layout(title=title, scene=dict(
-        xaxis=dict(title='X', range=[-limit,limit]),
-        yaxis=dict(title='Y', range=[-limit,limit]),
-        zaxis=dict(title='Z', range=[-limit,limit]),
-        aspectmode='cube',
-        bgcolor='rgb(248,248,248)'
-    ), paper_bgcolor='white', margin=dict(l=0,r=0,t=30,b=0))
+    # Preserve camera / UI between reruns for smoother feel
+    fig.update_layout(
+        title=title,
+        scene=dict(
+            xaxis=dict(title='X', range=[-limit,limit]),
+            yaxis=dict(title='Y', range=[-limit,limit]),
+            zaxis=dict(title='Z', range=[-limit,limit]),
+            aspectmode='cube',
+            bgcolor='rgb(248,248,248)'
+        ),
+        paper_bgcolor='white',
+        margin=dict(l=0,r=0,t=30,b=0),
+        uirevision="keep-view"
+    )
     return fig
 
 # =========================
@@ -147,7 +178,7 @@ def staged_rotation(alpha, beta, gamma, progress):
 # =========================
 st.set_page_config(page_title="Apparent Torsion Visualizer – Step Build", layout="wide")
 st.title("Apparent Torsion Visualizer – Step Build")
-st.caption("Set target angles and use the Progress slider to add torsion, then sagittal, then coronal — step by step.")
+st.caption("Set target angles once, then drag the Progress slider to add torsion → sagittal → coronal in sequence. Camera position is preserved for smoother viewing.")
 
 if "targets" not in st.session_state:
     st.session_state["targets"] = dict(alpha=0.0, beta=0.0, gamma=0.0)
@@ -163,7 +194,8 @@ with right:
         if applied:
             st.session_state["targets"].update(alpha=alpha_in, beta=beta_in, gamma=gamma_in)
     st.markdown("---")
-    show_bone = st.checkbox("Show bone model", value=True)
+    show_bone  = st.checkbox("Show bone model", value=True)
+    show_stick = st.checkbox("Show stick vectors", value=True)
     show_xyproj = st.checkbox("Show XY floor projection", value=True)
 
 with left:
@@ -178,6 +210,6 @@ with left:
     phi_xy = angle_xy(A_prox, A_dist)
     st.metric("Apparent torsion (XY) [deg]", f"{phi_xy:.2f}")
 
-    fig = build_scene(R, show_bone=show_bone, show_xyproj=show_xyproj,
+    fig = build_scene(R, show_bone=show_bone, show_stick=show_stick, show_xyproj=show_xyproj,
                       title=f"Stage progress={progress:.2f}")
     st.plotly_chart(fig, use_container_width=True)
